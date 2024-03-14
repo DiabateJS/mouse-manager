@@ -26,22 +26,33 @@ class Trajectoire:
             print(f'Déplacement de la souris à la position X = {p.x} , Y = {p.y}')
             pyautogui.moveTo(p.x,p.y, duration=10)
 
+    def getPostions(self):
+        return self.positions
+    
+    def setPositions(self, positions):
+        self.positions = positions
+
 class TrajectoireBuilder:
     def __init__(self,trajectoire):
         self.trajectoire = trajectoire
+        self.trajectoires = {
+            "Triangle":[Point(300,0),Point(0,300),Point(300,300)],
+            "Carre":[Point(300,300), Point(600,300), Point(600,600), Point(300,600)],
+            "Z":[Point(300,300), Point(600,300), Point(450,450), Point(300,600),Point(600,600)]
+        }
 
     def build(self):
         t = Trajectoire([],"")
-        if self.trajectoire == "Triangle":
-            triangle = [Point(300,0),Point(0,300),Point(300,300)]
-            t = Trajectoire(triangle,"Triangle")
-        if self.trajectoire == "Carre":
-            carre = [Point(300,300), Point(600,300), Point(600,600), Point(300,600)]
-            t = Trajectoire(carre,"Carre")
-        if self.trajectoire == "Z":
-            z = [Point(300,300), Point(600,300), Point(450,450), Point(300,600),Point(600,600)]
-            t = Trajectoire(z, "Z")
-        return t  
+        if self.trajectoire in self.trajectoires.keys():
+            t = Trajectoire(self.trajectoires[self.trajectoire], self.trajectoire)
+        return t
+
+    def setTrajectoires(self,trajectoires):
+        self.trajectoires = trajectoires
+    
+    def getTrajectoires(self):
+        return self.trajectoires
+
 
 class Application(Tk):
     def __init__(self):
@@ -50,7 +61,7 @@ class Application(Tk):
 
     def createWidgets(self): 
         self.title("Utilitaire de déplacement de souris")
-        self.geometry("600x600") 
+        self.geometry("600x650")
 
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(expand=True)
@@ -64,9 +75,12 @@ class Application(Tk):
         self.label2 = Label(self.deplacements, image=self.photoImage)
         self.label2.pack(pady=10)
 
+        trajectoireBuilder = TrajectoireBuilder("")
+        self.trajectoires = trajectoireBuilder.getTrajectoires()
+
         self.choix_combo = StringVar()
         self.combostrategies = ttk.Combobox(self.deplacements, textvariable=self.choix_combo)
-        self.combostrategies['values'] = ('Triangle','Carre','Z','Autre')
+        self.combostrategies['values'] = list(self.trajectoires.keys())
         self.combostrategies['state'] = 'readonly'
         self.combostrategies.current(0)
         self.combostrategies.pack(pady=10)
@@ -76,9 +90,10 @@ class Application(Tk):
 
         self.parametrages = ttk.Frame(self.notebook, width=600, height=600)
         self.list_trajectoire = Listbox(self.parametrages)
-        self.list_trajectoire.insert(1, 'Triangle')
-        self.list_trajectoire.insert(2, 'Carre')
-        self.list_trajectoire.insert(3, 'Z')
+        print(len(list(self.trajectoires)))
+        for index in range(len(list(self.trajectoires))):
+            print(index)
+            self.list_trajectoire.insert(index, list(self.trajectoires)[index])
 
         self.list_trajectoire.bind('<<ListboxSelect>>',self.trajectoire_select)
         self.list_trajectoire.pack()
@@ -98,6 +113,18 @@ class Application(Tk):
         self.point_y_var = StringVar()
         self.point_y = Entry(self.parametrages, textvariable=self.point_y_var)
         self.point_y.pack()
+
+        self.btnModif = Button(self.parametrages, text="Modifier Point", width=15, command=self.modifierPoint)
+        self.btnModif.pack()
+
+        self.btnNouveau = Button(self.parametrages, text="Nouveau Point", width=15, command=self.nouveauPoint)
+        self.btnNouveau.pack()
+
+        self.btnEnregistrer = Button(self.parametrages, text="Enregistrer Point", width=15, command=self.enregistrerPoint)
+        self.btnEnregistrer.pack()
+
+        self.btnSupprimer = Button(self.parametrages, text="Supprimer Point", width=15, command=self.supprimerPoint)
+        self.btnSupprimer.pack()
 
         self.apropos = ttk.Frame(self.notebook, width=600, height=600)
         self.label_textapropos = Label(self.apropos, text='Conception et Développement', font=("Arial",16))
@@ -125,32 +152,76 @@ class Application(Tk):
 
         self.mainloop()
 
+    def modifierPoint(self):
+        index_point = self.list_points_trajectoire.curselection()[0]
+        new_x = int(self.point_x_var.get())
+        new_y = int(self.point_y_var.get())
+        new_point = Point(new_x, new_y)
+        points_trajectoire_modif = self.trajectoires.get(self.current_trajectoire)
+        points_trajectoire_modif[index_point] = new_point
+        self.list_points_trajectoire.delete(0, END)
+        self.trajectoires[self.current_trajectoire] = points_trajectoire_modif
+        for index_pt in range(len(points_trajectoire_modif)):
+            self.list_points_trajectoire.insert(index_pt, str(points_trajectoire_modif[index_pt]))
+
+
+    def nouveauPoint(self):
+        self.point_x_var.set("")
+        self.point_y_var.set("")
+
+    def enregistrerPoint(self):
+        new_point_x = int(self.point_x_var.get())
+        new_point_y = int(self.point_y_var.get())
+        new_point = Point(new_point_x, new_point_y)
+        points_trajectoire = self.trajectoires[self.current_trajectoire]
+        points_trajectoire.append(new_point)
+        self.trajectoires[self.current_trajectoire] = points_trajectoire
+        self.list_points_trajectoire.insert(END, str(new_point))
+        self.point_x_var.set("")
+        self.point_y_var.set("")
+
+    def supprimerPoint(self):
+        if len(self.list_points_trajectoire.curselection()) > 0:
+            select_index = self.list_points_trajectoire.curselection()[0]
+            points_trajectoire = self.trajectoires[self.current_trajectoire]
+            del points_trajectoire[select_index]
+            self.trajectoires[self.current_trajectoire] = points_trajectoire
+            self.list_points_trajectoire.delete(0, END)
+            for index in range(len(points_trajectoire)):
+                self.list_points_trajectoire.insert(index, str(points_trajectoire[index]))
+            self.point_x_var.set("")
+            self.point_y_var.set("")
+        else:
+            messagebox.showwarning(message="Veuillez choisir un point à supprimer")
+
+
     def activer(self):
         print(self.choix_combo.get())
         if self.choix_combo.get() != "Autre":
+            points_trajectoire = self.trajectoires[self.choix_combo.get()]
             trajectoireBuilder = TrajectoireBuilder(self.choix_combo.get())
             trajectoire = trajectoireBuilder.build()
+            trajectoire.setPositions(points_trajectoire)
             trajectoire.deplacerSurPoints()
         else:
             messagebox.showwarning(message="Veuillez choisir une stratégie de déplacement")
     
     def trajectoire_select(self, event):
+        self.point_x_var.set("")
+        self.point_y_var.set("")
         select_index = self.list_trajectoire.curselection()[0]
-        tab_trajectoires = ('Triangle','Z','Carre')
+        tab_trajectoires = list(self.trajectoires.keys())
         if select_index < len(tab_trajectoires):
-            trajectoire = tab_trajectoires[select_index]
-            trajectoirBuilder = TrajectoireBuilder(trajectoire)
-            t = trajectoirBuilder.build()
+            self.current_trajectoire = tab_trajectoires[select_index]
             self.list_points_trajectoire.delete(0, END)
-            for index in range(len(t.positions)):
-                self.list_points_trajectoire.insert(index, t.positions[index])
+            positions = self.trajectoires[self.current_trajectoire]
+            for index in range(len(positions)):
+                self.list_points_trajectoire.insert(index, positions[index])
     
     def point_select(self, event):
         index = self.list_points_trajectoire.curselection()[0]
         select_item = self.list_points_trajectoire.get(index)
-        print(select_item)
         xy_str = select_item.split("(")[1].split(")")[0] 
-        print(xy_str)
         xy_tab = xy_str.split(",")
         x = xy_tab[0]
         y = xy_tab[1]
